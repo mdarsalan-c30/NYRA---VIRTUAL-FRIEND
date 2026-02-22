@@ -15,16 +15,31 @@ let serviceAccount;
 try {
     // Try environment variables first (Production/Render)
     if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY) {
-        // Clean up private key: handle escaped newlines, remove unwanted quotes, and trim
+        // Clean up private key: handle escaped newlines, remove unwanted quotes, stray backslashes, and trim
         let privateKey = process.env.FIREBASE_PRIVATE_KEY.trim();
 
-        // Remove leading/trailing quotes if they exist (even if mismatched)
+        // Remove leading/trailing quotes if they exist
         if (privateKey.startsWith('"')) privateKey = privateKey.substring(1);
         if (privateKey.endsWith('"')) privateKey = privateKey.substring(0, privateKey.length - 1);
         if (privateKey.startsWith("'")) privateKey = privateKey.substring(1);
         if (privateKey.endsWith("'")) privateKey = privateKey.substring(0, privateKey.length - 1);
 
+        // Handle common formatting issues:
+        // 1. Literal \n strings -> actual newlines
         privateKey = privateKey.replace(/\\n/g, '\n');
+
+        // 2. Stray backslashes (often added during copy-paste or as line continuations)
+        // We only keep backslashes if they are part of the BEGIN/END labels (unlikely)
+        // or if they are somehow necessary. In PEM, they are not.
+        privateKey = privateKey.replace(/\\/g, '');
+
+        // 3. Ensure the BEGIN/END headers are on their own lines if they got merged
+        if (privateKey.includes('-----BEGIN PRIVATE KEY-----') && !privateKey.startsWith('-----BEGIN PRIVATE KEY-----\n')) {
+            privateKey = privateKey.replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n');
+        }
+        if (privateKey.includes('-----END PRIVATE KEY-----') && !privateKey.includes('\n-----END PRIVATE KEY-----')) {
+            privateKey = privateKey.replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----');
+        }
 
         serviceAccount = {
             projectId: process.env.FIREBASE_PROJECT_ID,
