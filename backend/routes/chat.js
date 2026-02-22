@@ -31,7 +31,9 @@ router.post('/', async (req, res) => {
             emotionalState: emotionalDoc.exists ? emotionalDoc.data() : {},
             longTerm: longTermSnapshot.docs.map(doc => doc.data().summary).filter(Boolean),
             recentMessages: conversationsSnapshot.docs.map(doc => doc.data()).reverse(),
-            stats
+            stats,
+            persona: req.body.persona || 'nira', // Allow frontend to specify persona
+            visionDescription: req.body.visionDescription // Support for vision-enabled chats
         };
 
         console.log(`Fetched memory for ${userId}. Messages: ${memory.recentMessages.length}, Facts: ${memory.longTerm.length}`);

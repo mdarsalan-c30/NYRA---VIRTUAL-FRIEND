@@ -100,13 +100,13 @@ app.use('/api/memory', authenticate, memoryRoutes);
 // Health Check
 app.get('/api/tts-health', (req, res) => {
     const key = process.env.SARVAM_API_KEY || '';
-    const cleanKeySnippet = key.trim().replace(/^["']|["']$/g, '').substring(0, 5);
+    const cleanKey = key.trim().replace(/^["']|["']$/g, '');
     res.json({
         status: 'NIRA Backend Reachable ✅',
         time: new Date().toISOString(),
         sarvam_key_present: !!key,
-        sarvam_key_snippet: cleanKeySnippet + '...',
-        node_env: process.env.NODE_ENV || 'development'
+        sarvam_key_snippet: cleanKey.substring(0, 8) + '...',
+        node_env: process.env.NODE_ENV || 'production'
     });
 });
 
@@ -129,6 +129,23 @@ app.post('/api/tts', authenticate, async (req, res) => {
     } catch (error) {
         console.error(`❌ [PROD TTS ERROR]:`, error.message);
         res.status(500).json({ error: 'TTS Generation failed', details: error.message });
+    }
+});
+
+const visionService = require('./services/VisionService');
+app.post('/api/vision', authenticate, async (req, res) => {
+    try {
+        const { image } = req.body;
+        if (!image) return res.status(400).json({ error: 'Image is required' });
+
+        console.log(`👁️ [VISION REQUEST] Processing snapshot...`);
+        const description = await visionService.analyzeImage(image);
+
+        console.log(`✅ [VISION SUCCESS] Description: ${description?.substring(0, 30)}...`);
+        res.json({ description });
+    } catch (error) {
+        console.error(`❌ [VISION ERROR]:`, error.message);
+        res.status(500).json({ error: 'Vision analysis failed', details: error.message });
     }
 });
 

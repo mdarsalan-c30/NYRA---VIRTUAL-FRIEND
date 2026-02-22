@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { auth } from '../firebase';
 import { useVoice } from '../hooks/useVoice';
-import { Mic, Send, LogOut, Maximize2, Minimize2, Sparkles, MessageCircle } from 'lucide-react';
+import { Mic, Send, LogOut, Maximize2, Minimize2, Sparkles, MessageCircle, Camera, CameraOff } from 'lucide-react';
 import NiraAvatar from './NiraAvatar';
+import { cameraService } from '../services/CameraService';
 
 const Chat = () => {
     const [messages, setMessages] = useState([]);
@@ -21,8 +22,12 @@ const Chat = () => {
     const [persona, setPersona] = useState(() => localStorage.getItem('nira_persona') || 'nira');
     const [selectedVoice, setSelectedVoice] = useState(() => localStorage.getItem('nira_voice') || (isMobile ? 'ritu' : (persona === 'ali' ? 'rohan' : 'priya')));
     const [showSettings, setShowSettings] = useState(false);
+    const [isCameraOn, setIsCameraOn] = useState(false);
+    const [visionLoading, setVisionLoading] = useState(false);
+    const [visionContext, setVisionContext] = useState(null);
 
     const messagesEndRef = useRef(null);
+    const videoRef = useRef(null);
     const { speak, listen, isListening } = useVoice();
 
     const voices = {
@@ -77,8 +82,32 @@ const Chat = () => {
 
         try {
             const token = await auth.currentUser.getIdToken();
+
+            // If camera is on, capture a fresh snapshot for context
+            let activeVisionDescription = null;
+            if (isCameraOn && videoRef.current) {
+                setVisionLoading(true);
+                try {
+                    const snapshot = cameraService.takeSnapshot(videoRef.current);
+                    const visionRes = await axios.post(`${API_URL}/vision`,
+                        { image: snapshot },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+                    activeVisionDescription = visionRes.data.description;
+                    console.log("👁️ NIRA Vision Analysis:", activeVisionDescription);
+                } catch (vErr) {
+                    console.error("Vision capture failed:", vErr);
+                } finally {
+                    setVisionLoading(false);
+                }
+            }
+
             const response = await axios.post(`${API_URL}/chat`,
-                { message: text },
+                {
+                    message: text,
+                    persona,
+                    visionDescription: activeVisionDescription
+                },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -104,6 +133,23 @@ const Chat = () => {
             setMessages(prev => [...prev, { role: 'error', content: 'Connection hiccup. Try again?' }]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const toggleCamera = async () => {
+        if (isCameraOn) {
+            cameraService.stopCamera();
+            setIsCameraOn(false);
+        } else {
+            try {
+                const stream = await cameraService.startCamera();
+                setIsCameraOn(true);
+                setTimeout(() => {
+                    if (videoRef.current) videoRef.current.srcObject = stream;
+                }, 100);
+            } catch (err) {
+                alert("Could not access camera. Please check permissions.");
+            }
         }
     };
 
@@ -233,6 +279,9 @@ const Chat = () => {
                                 >
                                     TEST
                                 </button>
+                                <button onClick={toggleCamera} style={headerBtnStyle} title="Toggle Camera">
+                                    {isCameraOn ? <CameraOff size={16} color="#ef4444" /> : <Camera size={16} />}
+                                </button>
                                 <button onClick={() => setPersona(persona === 'nira' ? 'ali' : 'nira')} style={headerBtnStyle} title="Switch Persona">
                                     {persona === 'nira' ? '👩' : '👨'}
                                 </button>
@@ -319,6 +368,9 @@ const Chat = () => {
                                 <button onClick={() => { setImmersionMode(true); setShowSettings(false); }} style={{ ...appBtnStyle(false), color: '#8b5cf6' }}>
                                     FULL AVATAR MODE 🌌
                                 </button>
+                                <button onClick={toggleCamera} style={{ ...appBtnStyle(isCameraOn), color: isCameraOn ? '#ee4444' : '#10b981' }}>
+                                    NIRA SIGHT (CAMERA): {isCameraOn ? 'ON' : 'OFF'}
+                                </button>
                             </div>
                         </div>
 
@@ -394,6 +446,32 @@ const Chat = () => {
                     />
                 </div>
 
+                {/* Camera Feed Context (Floating Preview) */}
+                {isCameraOn && (
+                    <div style={{
+                        position: 'absolute', top: '100px', left: '20px',
+                        width: '120px', height: '160px', borderRadius: '15px',
+                        border: '2px solid rgba(255,255,255,0.2)', overflow: 'hidden',
+                        zIndex: 10, boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                        background: 'black', transition: 'all 0.3s ease',
+                        opacity: immersionMode ? 0.3 : 1
+                    }}>
+                        <video
+                            ref={videoRef} autoPlay playsInline muted
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        {visionLoading && (
+                            <div style={{
+                                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                background: 'rgba(99,102,241,0.3)', display: 'flex',
+                                alignItems: 'center', justifyContent: 'center', color: 'white'
+                            }}>
+                                <Sparkles size={20} className="animate-pulse" />
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Chat UI Layer */}
                 <div style={{
                     position: 'absolute',
@@ -457,6 +535,9 @@ const Chat = () => {
                         }}>
                             <button onClick={() => listen(handleSend, language)} style={actionBtnStyle(isListening, '#ef4444')}>
                                 <Mic size={20} />
+                            </button>
+                            <button onClick={toggleCamera} style={actionBtnStyle(isCameraOn, '#10b981')}>
+                                <Camera size={20} />
                             </button>
                             <input
                                 type="text" value={input}
@@ -537,7 +618,7 @@ const Chat = () => {
                     }
                 `}</style>
             </div>
-        </div>
+        </div >
     );
 };
 
