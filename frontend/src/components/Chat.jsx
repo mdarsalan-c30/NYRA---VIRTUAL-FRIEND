@@ -42,7 +42,14 @@ const Chat = () => {
         localStorage.setItem('nira_persona', persona);
     }, [persona]);
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const getBaseUrl = () => {
+        let url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        if (url.endsWith('/')) url = url.slice(0, -1);
+        // Ensure /api suffix if missing
+        if (!url.endsWith('/api')) url += '/api';
+        return url;
+    };
+    const API_URL = getBaseUrl();
 
     const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     useEffect(() => { scrollToBottom(); }, [messages]);

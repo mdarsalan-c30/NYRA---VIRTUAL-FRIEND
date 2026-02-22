@@ -1,10 +1,13 @@
-const express = require('express');
-const cors = require('cors');
 const dotenv = require('dotenv');
-const admin = require('firebase-admin');
 const path = require('path');
 
-dotenv.config({ path: '../.env' });
+// Load environment variables immediately at the start
+dotenv.config(); // Loads from .env in the current working directory
+dotenv.config({ path: path.join(__dirname, '../.env') }); // Fallback to root .env if it exists
+
+const express = require('express');
+const cors = require('cors');
+const admin = require('firebase-admin');
 
 const app = express();
 app.use(cors());
