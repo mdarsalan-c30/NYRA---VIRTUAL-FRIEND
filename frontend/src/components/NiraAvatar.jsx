@@ -93,19 +93,28 @@ const DigitalEntity = ({ isSpeaking, isListening, isThinking }) => {
 };
 
 // --- Portrait Camera Setup ---
-const Rig = ({ isFullScreen }) => {
-    const { camera, mouse } = useThree();
+const Rig = () => {
+    const { camera, mouse, size } = useThree();
+    const isMobile = size.width < 768;
+
     useFrame(() => {
         // Subtle camera follow
         camera.position.x = THREE.MathUtils.lerp(camera.position.x, mouse.x * 0.1, 0.05);
         camera.position.y = THREE.MathUtils.lerp(camera.position.y, mouse.y * 0.1, 0.05);
-        camera.lookAt(0, 0.2, 0);
+
+        // Dynamic FOV adjustment for vertical screens
+        const aspect = size.width / size.height;
+        camera.fov = aspect < 1 ? 45 : 35;
+        camera.updateProjectionMatrix();
+
+        camera.lookAt(0, isMobile ? 0.4 : 0.2, 0);
     });
     return null;
 };
 
-const NiraAvatar = ({ isSpeaking = false, isListening = false, isThinking = false, isFullScreen = false }) => {
+const NiraAvatar = ({ isSpeaking = false, isListening = false, isThinking = false, isFullScreen = false, immersionMode = false }) => {
     const statusColor = isListening ? '#10b981' : isSpeaking ? '#8b5cf6' : '#6366f1';
+    const isMobile = window.innerWidth < 768;
 
     return (
         <div style={{
@@ -116,7 +125,7 @@ const NiraAvatar = ({ isSpeaking = false, isListening = false, isThinking = fals
         }}>
             <Canvas
                 shadows
-                camera={{ position: [0, 0.2, 2.8], fov: 35 }} // Tight Face/Chest focus
+                camera={{ position: [0, 0.2, 2.8], fov: isMobile ? 45 : 35 }}
                 gl={{ antialias: true }}
             >
                 <color attach="background" args={['#010103']} />
@@ -127,7 +136,7 @@ const NiraAvatar = ({ isSpeaking = false, isListening = false, isThinking = fals
                 <pointLight position={[-2, 2, 2]} intensity={1} color={statusColor} />
 
                 <Suspense fallback={null}>
-                    <group position={[0, -0.2, 0]} scale={1.2}>
+                    <group position={[0, isMobile ? -0.5 : -0.2, 0]} scale={isMobile ? 1 : 1.2}>
                         <DigitalEntity
                             isSpeaking={isSpeaking}
                             isListening={isListening}
@@ -138,27 +147,29 @@ const NiraAvatar = ({ isSpeaking = false, isListening = false, isThinking = fals
                     <ContactShadows position={[0, -2, 0]} opacity={0.4} scale={10} blur={2} far={1} />
                 </Suspense>
 
-                <Rig isFullScreen={isFullScreen} />
+                <Rig />
                 {!isFullScreen && <OrbitControls enableZoom={false} enablePan={false} maxPolarAngle={Math.PI / 1.5} minPolarAngle={Math.PI / 3} />}
             </Canvas>
 
-            {/* Glowing Status Ring UI */}
-            <div style={{
-                position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)',
-                textAlign: 'center', pointerEvents: 'none'
-            }}>
+            {/* Glowing Status Ring UI (Only in regular mode) */}
+            {!immersionMode && (
                 <div style={{
-                    width: '100px', height: '100px', borderRadius: '50%',
-                    border: `2px solid ${statusColor}`,
-                    boxShadow: `0 0 30px ${statusColor}44`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    animation: isSpeaking || isListening ? 'pulse 2s infinite' : 'none'
+                    position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)',
+                    textAlign: 'center', pointerEvents: 'none'
                 }}>
-                    <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2px' }}>
-                        {isListening ? 'Alive' : isThinking ? 'Thinking' : 'NIRA'}
-                    </span>
+                    <div style={{
+                        width: '100px', height: '100px', borderRadius: '50%',
+                        border: `2px solid ${statusColor}`,
+                        boxShadow: `0 0 30px ${statusColor}44`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        animation: isSpeaking || isListening ? 'pulse 2s infinite' : 'none'
+                    }}>
+                        <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2px' }}>
+                            {isListening ? 'Alive' : isThinking ? 'Thinking' : 'NIRA'}
+                        </span>
+                    </div>
                 </div>
-            </div>
+            )}
 
             <style>{`
                 @keyframes pulse {

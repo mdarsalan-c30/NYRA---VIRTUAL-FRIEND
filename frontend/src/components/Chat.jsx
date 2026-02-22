@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { auth } from '../firebase';
 import { useVoice } from '../hooks/useVoice';
-import { Mic, Send, LogOut, Maximize2, Minimize2, Sparkles } from 'lucide-react';
+import { Mic, Send, LogOut, Maximize2, Minimize2, Sparkles, MessageCircle } from 'lucide-react';
 import NiraAvatar from './NiraAvatar';
 
 const Chat = () => {
@@ -16,9 +16,11 @@ const Chat = () => {
     const [seamlessV2V, setSeamlessV2V] = useState(true);
     const [showChat, setShowChat] = useState(window.innerWidth > 1024); // Show by default on large screens
     const [stats, setStats] = useState({ days: 1, interactions: 0 });
-    const [language, setLanguage] = useState(() => localStorage.getItem('nira_lang') || 'en');
+    const isMobile = window.innerWidth < 768;
+    const [language, setLanguage] = useState(() => localStorage.getItem('nira_lang') || (isMobile ? 'hi' : 'en'));
     const [persona, setPersona] = useState(() => localStorage.getItem('nira_persona') || 'nira');
-    const [selectedVoice, setSelectedVoice] = useState(() => localStorage.getItem('nira_voice') || (persona === 'ali' ? 'rohan' : 'priya'));
+    const [selectedVoice, setSelectedVoice] = useState(() => localStorage.getItem('nira_voice') || (isMobile ? 'ritu' : (persona === 'ali' ? 'rohan' : 'priya')));
+    const [showSettings, setShowSettings] = useState(false);
 
     const messagesEndRef = useRef(null);
     const { speak, listen, isListening } = useVoice();
@@ -105,7 +107,63 @@ const Chat = () => {
         }
     };
 
-    const isMobile = window.innerWidth < 768;
+    const headerBtnStyle = {
+        background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '10px',
+        padding: '6px 10px',
+        color: 'white',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.2s ease',
+        fontSize: '0.8rem',
+        fontWeight: 500,
+    };
+
+    const actionBtnStyle = (isActive, color) => ({
+        width: '44px',
+        height: '44px',
+        borderRadius: '50%',
+        border: 'none',
+        background: isActive ? color : 'rgba(255,255,255,0.1)',
+        color: 'white',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.2s ease',
+    });
+
+    const settingItemStyle = {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        color: 'white',
+    };
+
+    const settingLabelStyle = {
+        fontSize: '0.8rem',
+        color: 'rgba(255,255,255,0.5)',
+        fontWeight: 600,
+        marginBottom: '10px',
+        textTransform: 'uppercase'
+    };
+
+    const appBtnStyle = (isActive) => ({
+        padding: '15px 20px',
+        borderRadius: '15px',
+        border: isActive ? '1px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
+        background: isActive ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
+        color: isActive ? 'white' : 'rgba(255,255,255,0.7)',
+        fontSize: '0.9rem',
+        fontWeight: 600,
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        textAlign: 'center',
+        flex: 1
+    });
 
     return (
         <div style={{
@@ -147,53 +205,132 @@ const Chat = () => {
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        {/* Voice Selector */}
-                        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '2px 8px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                            <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', marginRight: '6px', alignSelf: 'center' }}>VOICE</span>
-                            <select
-                                value={selectedVoice}
-                                onChange={(e) => setSelectedVoice(e.target.value)}
-                                style={{ background: 'none', border: 'none', color: 'white', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', padding: '4px 0' }}
-                            >
-                                {(persona === 'ali' ? voices.male : voices.female).map(v => (
-                                    <option key={v} value={v} style={{ background: '#0a081e', color: 'white', textTransform: 'capitalize' }}>
-                                        {v.charAt(0).toUpperCase() + v.slice(1)}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        {/* Desktop Only Voice Selector */}
+                        {!isMobile && (
+                            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '2px 8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', marginRight: '6px', alignSelf: 'center' }}>VOICE</span>
+                                <select
+                                    value={selectedVoice}
+                                    onChange={(e) => setSelectedVoice(e.target.value)}
+                                    style={{ background: 'none', border: 'none', color: 'white', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', padding: '4px 0' }}
+                                >
+                                    {(persona === 'ali' ? voices.male : voices.female).map(v => (
+                                        <option key={v} value={v} style={{ background: '#0a081e', color: 'white', textTransform: 'capitalize' }}>
+                                            {v.charAt(0).toUpperCase() + v.slice(1)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
-                        <button
-                            onClick={() => speak("Namaste, I am testing your selected voice.", null, null, language, selectedVoice, persona === 'ali' ? 'male' : 'female')}
-                            style={{ ...headerBtnStyle, fontSize: '0.7rem', color: '#8b5cf6' }}
-                            title="Test Current Voice"
-                        >
-                            TEST
-                        </button>
-                        <button onClick={() => setPersona(persona === 'nira' ? 'ali' : 'nira')} style={headerBtnStyle} title="Switch Persona">
-                            {persona === 'nira' ? '👩' : '👨'}
-                        </button>
-                        <button onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')} style={headerBtnStyle} title="Switch Language">
-                            {language === 'en' ? '🇺🇸' : '🇮🇳'}
-                        </button>
-                        <button onClick={() => setSeamlessV2V(!seamlessV2V)} style={{ ...headerBtnStyle, color: seamlessV2V ? '#10b981' : 'white' }} title="Toggle Auto-Voice Loop">
-                            {seamlessV2V ? '🎤♾️' : '🎤'}
-                        </button>
-                        <button onClick={() => setImmersionMode(true)} style={headerBtnStyle} title="Focus Mode">
-                            <Sparkles size={16} />
-                        </button>
-                        <button onClick={() => setShowChat(!showChat)} style={headerBtnStyle} title="Toggle Chat Panel">
-                            {showChat ? '📖' : '💬'}
-                        </button>
-                        <button onClick={() => setIsFullScreen(!isFullScreen)} style={headerBtnStyle}>
-                            {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                        </button>
-                        <button onClick={() => auth.signOut()} style={{ ...headerBtnStyle, background: 'none', border: 'none' }}>
-                            <LogOut size={16} />
-                        </button>
+                        {!isMobile && (
+                            <>
+                                <button
+                                    onClick={() => speak("Namaste, I am testing your selected voice.", null, null, language, selectedVoice, persona === 'ali' ? 'male' : 'female')}
+                                    style={{ ...headerBtnStyle, fontSize: '0.7rem', color: '#8b5cf6' }}
+                                    title="Test Current Voice"
+                                >
+                                    TEST
+                                </button>
+                                <button onClick={() => setPersona(persona === 'nira' ? 'ali' : 'nira')} style={headerBtnStyle} title="Switch Persona">
+                                    {persona === 'nira' ? '👩' : '👨'}
+                                </button>
+                                <button onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')} style={headerBtnStyle} title="Switch Language">
+                                    {language === 'en' ? '🇺🇸' : '🇮🇳'}
+                                </button>
+                                <button onClick={() => setSeamlessV2V(!seamlessV2V)} style={{ ...headerBtnStyle, color: seamlessV2V ? '#10b981' : 'white' }} title="Toggle Auto-Voice Loop">
+                                    {seamlessV2V ? '🎤♾️' : '🎤'}
+                                </button>
+                                <button onClick={() => setImmersionMode(true)} style={headerBtnStyle} title="Focus Mode">
+                                    <Sparkles size={16} />
+                                </button>
+                                <button onClick={() => setShowChat(!showChat)} style={headerBtnStyle} title="Toggle Chat Panel">
+                                    {showChat ? '📖' : '💬'}
+                                </button>
+                                <button onClick={() => setIsFullScreen(!isFullScreen)} style={headerBtnStyle}>
+                                    {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                                </button>
+                                <button onClick={() => auth.signOut()} style={{ ...headerBtnStyle, background: 'none', border: 'none' }}>
+                                    <LogOut size={16} />
+                                </button>
+                            </>
+                        )}
+
+                        {isMobile && (
+                            <button onClick={() => setShowSettings(true)} style={{ ...headerBtnStyle, padding: '8px 16px', borderRadius: '20px', background: '#6366f1', border: 'none', fontWeight: 700 }}>
+                                MENU
+                            </button>
+                        )}
                     </div>
                 </header>
+            )}
+
+            {/* Mobile Settings Overlay (App Style) */}
+            {showSettings && isMobile && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 1000,
+                    background: 'rgba(10,8,30,0.95)', backdropFilter: 'blur(20px)',
+                    display: 'flex', flexDirection: 'column'
+                }}>
+                    <div style={{ padding: '40px 25px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h1 style={{ color: 'white', margin: 0, fontSize: '2rem', fontWeight: 900 }}>Settings</h1>
+                        <button onClick={() => setShowSettings(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1.2rem' }}>✕</button>
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 25px', display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                        <div style={settingItemStyle}>
+                            <span style={settingLabelStyle}>VOICE</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                                {(persona === 'ali' ? voices.male : voices.female).map(v => (
+                                    <button
+                                        key={v}
+                                        onClick={() => setSelectedVoice(v)}
+                                        style={appBtnStyle(selectedVoice === v)}
+                                    >
+                                        {v.charAt(0).toUpperCase() + v.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div style={settingItemStyle}>
+                            <span style={settingLabelStyle}>PERSONALITY</span>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button onClick={() => setPersona('nira')} style={appBtnStyle(persona === 'nira')}>NIRA 👩</button>
+                                <button onClick={() => setPersona('ali')} style={appBtnStyle(persona === 'ali')}>ALI 👨</button>
+                            </div>
+                        </div>
+
+                        <div style={settingItemStyle}>
+                            <span style={settingLabelStyle}>LANGUAGE</span>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button onClick={() => setLanguage('hi')} style={appBtnStyle(language === 'hi')}>HINDI 🇮🇳</button>
+                                <button onClick={() => setLanguage('en')} style={appBtnStyle(language === 'en')}>ENGLISH 🇺🇸</button>
+                            </div>
+                        </div>
+
+                        <div style={settingItemStyle}>
+                            <span style={settingLabelStyle}>IMMERSION</span>
+                            <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
+                                <button onClick={() => setSeamlessV2V(!seamlessV2V)} style={appBtnStyle(seamlessV2V)}>
+                                    AUTO-VOICE LOOP: {seamlessV2V ? 'ON' : 'OFF'}
+                                </button>
+                                <button onClick={() => { setImmersionMode(true); setShowSettings(false); }} style={{ ...appBtnStyle(false), color: '#8b5cf6' }}>
+                                    FULL AVATAR MODE 🌌
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ marginTop: 'auto', paddingBottom: '40px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                            <div style={{ display: 'flex', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '15px' }}>
+                                <div style={{ flex: 1, textAlign: 'center' }}><div style={{ color: 'white', fontWeight: 800 }}>{stats.days}</div><div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)' }}>DAYS</div></div>
+                                <div style={{ flex: 1, textAlign: 'center' }}><div style={{ color: 'white', fontWeight: 800 }}>{stats.interactions}</div><div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)' }}>HITS</div></div>
+                            </div>
+                            <button onClick={() => auth.signOut()} style={{ padding: '15px', borderRadius: '15px', border: '1px solid #ef4444', color: '#ef4444', background: 'none', fontWeight: 700 }}>SIGN OUT</button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Immersion Mode Controls Overlay */}
@@ -253,6 +390,7 @@ const Chat = () => {
                         isThinking={loading}
                         isFullScreen={true}
                         persona={persona}
+                        immersionMode={immersionMode}
                     />
                 </div>
 
@@ -263,22 +401,31 @@ const Chat = () => {
                     bottom: 0,
                     right: 0,
                     width: isMobile ? '100%' : '400px',
-                    height: isMobile ? (mobileStatus ? '80%' : '0%') : '100%',
-                    background: isMobile ? 'rgba(10,8,30,0.95)' : 'rgba(10,8,30,0.4)',
-                    backdropFilter: 'blur(20px)',
+                    height: isMobile ? (mobileStatus ? '75%' : '0%') : '100%',
+                    background: isMobile ? 'rgba(10,8,30,0.98)' : 'rgba(10,8,30,0.4)',
+                    backdropFilter: 'blur(30px)',
                     borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
-                    borderTopLeftRadius: isMobile ? '30px' : '0',
-                    borderTopRightRadius: isMobile ? '30px' : '0',
+                    borderTopLeftRadius: isMobile ? '40px' : '0',
+                    borderTopRightRadius: isMobile ? '40px' : '0',
                     display: 'flex', flexDirection: 'column',
-                    zIndex: 10,
-                    opacity: (immersionMode || !showChat) ? 0 : 1,
-                    pointerEvents: (immersionMode || !showChat || (isMobile && !mobileStatus)) ? 'none' : 'auto',
-                    transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                    transform: (showChat || (isMobile && mobileStatus)) ? 'translateX(0)' : 'translateX(100%)',
-                    boxShadow: isMobile ? '0 -10px 40px rgba(0,0,0,0.8)' : '-10px 0 30px rgba(0,0,0,0.5)',
+                    zIndex: 200, // Above settings if needed
+                    opacity: immersionMode ? 0 : (isMobile && !mobileStatus ? 0 : 1),
+                    pointerEvents: (immersionMode || (isMobile && !mobileStatus)) ? 'none' : 'auto',
+                    transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+                    transform: (isMobile)
+                        ? (mobileStatus ? 'translateY(0)' : 'translateY(100%)')
+                        : (showChat ? 'translateX(0)' : 'translateX(100%)'),
+                    boxShadow: isMobile ? '0 -20px 60px rgba(0,0,0,0.9)' : '-10px 0 30px rgba(0,0,0,0.5)',
                 }}>
                     {isMobile && (
-                        <div onClick={() => setMobileStatus(false)} style={{ width: '40px', height: '4px', background: 'rgba(255,255,255,0.2)', borderRadius: '10px', margin: '15px auto', cursor: 'pointer' }} />
+                        <div
+                            onClick={() => setMobileStatus(false)}
+                            style={{
+                                width: '60px', height: '6px', background: 'rgba(255,255,255,0.15)',
+                                borderRadius: '10px', margin: '12px auto', cursor: 'pointer',
+                                border: '1px solid rgba(255,255,255,0.05)'
+                            }}
+                        />
                     )}
 
                     <main style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -340,20 +487,55 @@ const Chat = () => {
                     </button>
                 )}
 
-                {/* Mobile FAB */}
+                {/* Mobile FAB - Mic only */}
+                {isMobile && !mobileStatus && !immersionMode && (
+                    <div style={{
+                        position: 'fixed', bottom: '40px', left: '0', right: '0',
+                        display: 'flex', justifyContent: 'center', alignItems: 'center', pointerEvents: 'none'
+                    }}>
+                        <button
+                            onClick={() => listen(handleSend, language)}
+                            style={{
+                                width: '85px', height: '85px',
+                                borderRadius: '50%', background: isListening ? '#ef4444' : '#6366f1', color: 'white', border: 'none',
+                                boxShadow: `0 20px 40px ${isListening ? 'rgba(239,68,68,0.5)' : 'rgba(99,102,241,0.5)'}`,
+                                zIndex: 150, cursor: 'pointer', pointerEvents: 'auto',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                                animation: isListening ? 'pulse-mic 1.5s infinite' : 'none',
+                                border: '2px solid rgba(255,255,255,0.1)'
+                            }}
+                        >
+                            <Mic size={38} />
+                        </button>
+                    </div>
+                )}
+
+                {/* Mobile FAB - Chat Drawer Toggle */}
                 {isMobile && !mobileStatus && !immersionMode && (
                     <button
                         onClick={() => setMobileStatus(true)}
                         style={{
-                            position: 'fixed', bottom: '30px', right: '30px', width: '60px', height: '60px',
-                            borderRadius: '50%', background: '#6366f1', color: 'white', border: 'none',
-                            boxShadow: '0 10px 30px rgba(99,102,241,0.5)', zIndex: 5, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            position: 'fixed', bottom: '57px', right: '25px', width: '55px', height: '55px',
+                            borderRadius: '50%', background: 'rgba(255,255,255,0.1)', color: 'white',
+                            border: '1px solid rgba(255,255,255,0.2)', backdropFilter: 'blur(20px)',
+                            zIndex: 150, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.3s ease',
+                            boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
                         }}
                     >
-                        <Mic size={28} />
+                        <MessageCircle size={24} />
                     </button>
                 )}
+
+                <style>{`
+                    @keyframes pulse-mic {
+                        0% { transform: translateX(-50%) scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+                        70% { transform: translateX(-50%) scale(1.1); box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+                        100% { transform: translateX(-50%) scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+                    }
+                `}</style>
             </div>
         </div>
     );
@@ -385,5 +567,27 @@ const actionBtnStyle = (active, color) => ({
     cursor: 'pointer',
     transition: 'all 0.3s',
 });
+
+const appBtnStyle = (active) => ({
+    padding: '16px',
+    borderRadius: '16px',
+    border: 'none',
+    background: active ? '#6366f1' : 'rgba(255,255,255,0.05)',
+    color: 'white',
+    fontWeight: 700,
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+    textAlign: 'center'
+});
+
+const settingLabelStyle = {
+    fontSize: '0.7rem',
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: 800,
+    letterSpacing: '2px',
+    marginBottom: '10px',
+    display: 'block'
+};
 
 export default Chat;
