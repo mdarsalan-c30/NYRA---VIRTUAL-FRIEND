@@ -18,9 +18,25 @@ const Chat = () => {
     const [stats, setStats] = useState({ days: 1, interactions: 0 });
     const [language, setLanguage] = useState(() => localStorage.getItem('nira_lang') || 'en');
     const [persona, setPersona] = useState(() => localStorage.getItem('nira_persona') || 'nira');
+    const [selectedVoice, setSelectedVoice] = useState(() => localStorage.getItem('nira_voice') || (persona === 'ali' ? 'rohan' : 'priya'));
 
     const messagesEndRef = useRef(null);
     const { speak, listen, isListening } = useVoice();
+
+    const voices = {
+        female: ['priya', 'ritu', 'pooja', 'neha', 'simran', 'kavya'],
+        male: ['rohan', 'aditya', 'rahul', 'amit', 'dev', 'varun']
+    };
+
+    useEffect(() => {
+        // Reset voice when persona changes if the current voice doesn't match the new gender
+        const currentCategory = voices.female.includes(selectedVoice) ? 'female' : 'male';
+        const targetCategory = persona === 'ali' ? 'male' : 'female';
+        if (currentCategory !== targetCategory) {
+            const nextVoice = targetCategory === 'male' ? 'rohan' : 'priya';
+            setSelectedVoice(nextVoice);
+        }
+    }, [persona]);
 
     const getBaseUrl = () => {
         let url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -47,6 +63,7 @@ const Chat = () => {
 
     useEffect(() => { localStorage.setItem('nira_lang', language); }, [language]);
     useEffect(() => { localStorage.setItem('nira_persona', persona); }, [persona]);
+    useEffect(() => { localStorage.setItem('nira_voice', selectedVoice); }, [selectedVoice]);
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
     const handleSend = async (text = input) => {
@@ -66,6 +83,7 @@ const Chat = () => {
             const aiResponse = response.data.response;
             setMessages(prev => [...prev, { role: 'model', content: aiResponse }]);
 
+            console.log(`🗣️ NIRA triggering speech: [${selectedVoice}] for persona [${persona}]`);
             speak(aiResponse,
                 () => setIsSpeaking(true),
                 () => {
@@ -76,6 +94,7 @@ const Chat = () => {
                     }
                 },
                 language,
+                selectedVoice,
                 persona === 'ali' ? 'male' : 'female'
             );
         } catch (error) {
@@ -128,7 +147,30 @@ const Chat = () => {
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {/* Voice Selector */}
+                        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '2px 8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', marginRight: '6px', alignSelf: 'center' }}>VOICE</span>
+                            <select
+                                value={selectedVoice}
+                                onChange={(e) => setSelectedVoice(e.target.value)}
+                                style={{ background: 'none', border: 'none', color: 'white', fontSize: '0.8rem', outline: 'none', cursor: 'pointer', padding: '4px 0' }}
+                            >
+                                {(persona === 'ali' ? voices.male : voices.female).map(v => (
+                                    <option key={v} value={v} style={{ background: '#0a081e', color: 'white', textTransform: 'capitalize' }}>
+                                        {v.charAt(0).toUpperCase() + v.slice(1)}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <button
+                            onClick={() => speak("Namaste, I am testing your selected voice.", null, null, language, selectedVoice, persona === 'ali' ? 'male' : 'female')}
+                            style={{ ...headerBtnStyle, fontSize: '0.7rem', color: '#8b5cf6' }}
+                            title="Test Current Voice"
+                        >
+                            TEST
+                        </button>
                         <button onClick={() => setPersona(persona === 'nira' ? 'ali' : 'nira')} style={headerBtnStyle} title="Switch Persona">
                             {persona === 'nira' ? '👩' : '👨'}
                         </button>

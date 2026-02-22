@@ -97,6 +97,28 @@ app.use('/api/chat', authenticate, chatRoutes);
 const memoryRoutes = require('./routes/memory');
 app.use('/api/memory', authenticate, memoryRoutes);
 
+const ttsService = require('./services/sarvam');
+app.post('/api/tts', authenticate, async (req, res) => {
+    try {
+        const { text, languageCode, speaker } = req.body;
+        console.log(`📡 [TTS REQUEST] Speaker: ${speaker}, Lang: ${languageCode}, Text: ${text?.substring(0, 20)}...`);
+
+        const audioData = await ttsService.generateTTS(text, languageCode, speaker);
+
+        if (audioData) {
+            console.log(`✅ [TTS SUCCESS] Audio generated successfully for ${speaker}`);
+            res.json({ audio: audioData });
+        } else {
+            console.error(`⚠️ [TTS EMPTY] No audio data returned for ${speaker}`);
+            res.status(500).json({ error: 'No audio data' });
+        }
+    } catch (error) {
+        const errorMsg = error.response ? JSON.stringify(error.response.data) : error.message;
+        console.error(`❌ [TTS ERROR] Error Details: ${errorMsg}`);
+        res.status(500).json({ error: 'Failed to generate speech', details: errorMsg });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 NIRA Backend running on port ${PORT}`);
 });

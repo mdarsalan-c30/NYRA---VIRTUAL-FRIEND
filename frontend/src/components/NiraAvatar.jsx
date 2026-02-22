@@ -1,180 +1,170 @@
 import React, { Suspense, useRef, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Float, Stars } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, Environment, ContactShadows, Float, MeshDistortMaterial, MeshWobbleMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 
-// --- Global Error Boundary for 3D Errors ---
-class ErrorBoundary extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = { hasError: false };
-    }
-    static getDerivedStateFromError(error) {
-        return { hasError: true };
-    }
-    componentDidCatch(error, errorInfo) {
-        console.error("3D Render Error:", error, errorInfo);
-    }
-    render() {
-        if (this.state.hasError) return this.props.fallback;
-        return this.props.children;
-    }
-}
+// --- Custom Digital AI Entity ---
+const DigitalEntity = ({ isSpeaking, isListening, isThinking }) => {
+    const headRef = useRef();
+    const mouthRef = useRef();
+    const leftEyeRef = useRef();
+    const rightEyeRef = useRef();
 
-// --- Particle Sphere Component ---
-const ParticleSphere = ({ isSpeaking, isThinking, isListening, glowColor }) => {
-    const pointsRef = useRef();
-    const count = 3000;
-
-    const [positions, sizes] = useMemo(() => {
-        const pos = new Float32Array(count * 3);
-        const sz = new Float32Array(count);
-        for (let i = 0; i < count; i++) {
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-            const r = 2 + Math.random() * 0.2;
-
-            pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-            pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-            pos[i * 3 + 2] = r * Math.cos(phi);
-
-            sz[i] = Math.random();
-        }
-        return [pos, sz];
-    }, []);
+    // Status-based colors
+    const primaryColor = isListening ? '#10b981' : isSpeaking ? '#8b5cf6' : isThinking ? '#6366f1' : '#6366f1';
+    const emissiveInt = isSpeaking ? 1.5 : isListening ? 2 : 0.8;
 
     useFrame((state) => {
         const time = state.clock.getElapsedTime();
-        if (pointsRef.current) {
-            // Base rotation
-            pointsRef.current.rotation.y = time * 0.15;
-            pointsRef.current.rotation.z = time * 0.1;
 
-            // Reaction to status
-            let speed = 0.5;
-            let intensity = 1.0;
+        // 1. Subtle Head Sway
+        if (headRef.current) {
+            headRef.current.rotation.y = Math.sin(time * 0.5) * 0.1;
+            headRef.current.rotation.x = Math.cos(time * 0.3) * 0.05;
+        }
 
-            if (isSpeaking) {
-                speed = 2.0;
-                intensity = 1.2 + Math.sin(time * 15) * 0.1;
-            } else if (isListening) {
-                speed = 1.0;
-                intensity = 1.3;
-            } else if (isThinking) {
-                speed = 0.3;
-                intensity = 1.1;
-            }
+        // 2. Blinking Logic
+        const blink = (Math.sin(time * 0.5) > 0.98 || (time % 4 < 0.1)) ? 0 : 1;
+        if (leftEyeRef.current) leftEyeRef.current.scale.y = THREE.MathUtils.lerp(leftEyeRef.current.scale.y, blink, 0.2);
+        if (rightEyeRef.current) rightEyeRef.current.scale.y = THREE.MathUtils.lerp(rightEyeRef.current.scale.y, blink, 0.2);
 
-            pointsRef.current.scale.setScalar(intensity * (1 + Math.sin(time * speed) * 0.03));
+        // 3. Lip Sync (Mouth Morphs)
+        if (mouthRef.current) {
+            const mouthScale = isSpeaking ? (0.2 + Math.abs(Math.sin(time * 20)) * 1.5) : 0.1;
+            mouthRef.current.scale.y = THREE.MathUtils.lerp(mouthRef.current.scale.y, mouthScale, 0.3);
+            mouthRef.current.scale.x = isSpeaking ? (1 + Math.sin(time * 10) * 0.2) : 1;
         }
     });
 
     return (
-        <points ref={pointsRef}>
-            <bufferGeometry>
-                <bufferAttribute
-                    attach="attributes-position"
-                    count={count}
-                    array={positions}
-                    itemSize={3}
+        <group position={[0, 0, 0]}>
+            {/* The Head - Crystalline Digital Sphere */}
+            <mesh ref={headRef} position={[0, 0, 0]}>
+                <sphereGeometry args={[1, 64, 64]} />
+                <MeshDistortMaterial
+                    color={primaryColor}
+                    envMapIntensity={1}
+                    clearcoat={1}
+                    clearcoatRoughness={0}
+                    metalness={0.9}
+                    roughness={0.1}
+                    distort={0.2}
+                    speed={2}
                 />
-            </bufferGeometry>
-            <pointsMaterial
-                size={0.035} // Slightly larger for better visibility
-                color={glowColor}
-                transparent
-                opacity={0.9}
-                blending={THREE.AdditiveBlending}
-                sizeAttenuation
-            />
-        </points>
+            </mesh>
+
+            {/* Eyes - Emissive Digital Orbs */}
+            <mesh ref={leftEyeRef} position={[-0.35, 0.2, 0.85]}>
+                <sphereGeometry args={[0.08, 32, 32]} />
+                <meshStandardMaterial color="white" emissive={primaryColor} emissiveIntensity={emissiveInt} />
+            </mesh>
+            <mesh ref={rightEyeRef} position={[0.35, 0.2, 0.85]}>
+                <sphereGeometry args={[0.08, 32, 32]} />
+                <meshStandardMaterial color="white" emissive={primaryColor} emissiveIntensity={emissiveInt} />
+            </mesh>
+
+            {/* Mouth - Responsive Sound Wave Viseme */}
+            <mesh ref={mouthRef} position={[0, -0.4, 0.9]}>
+                <capsuleGeometry args={[0.03, 0.3, 4, 16]} />
+                <meshStandardMaterial color="white" emissive={primaryColor} emissiveIntensity={emissiveInt * 2} />
+            </mesh>
+
+            {/* Neck / Torso Base */}
+            <mesh position={[0, -1.8, -0.2]}>
+                <cylinderGeometry args={[0.4, 0.8, 2, 32]} />
+                <meshStandardMaterial
+                    color="#0a0a0f"
+                    transparent
+                    opacity={0.8}
+                    roughness={0}
+                    metalness={1}
+                />
+            </mesh>
+
+            {/* Floating Particles/Data Halo */}
+            <Float speed={2} rotationIntensity={1} floatIntensity={1}>
+                <mesh position={[0, 0, -1]} rotation={[Math.PI / 2, 0, 0]}>
+                    <torusGeometry args={[1.5, 0.01, 16, 100]} />
+                    <meshStandardMaterial color={primaryColor} emissive={primaryColor} emissiveIntensity={0.5} transparent opacity={0.3} />
+                </mesh>
+            </Float>
+        </group>
     );
 };
 
-// --- Main Avatar Component ---
-const NiraAvatar = ({ isSpeaking = false, isListening = false, isThinking = false, isFullScreen = false, persona = 'nira' }) => {
-    const isAli = persona === 'ali';
-    const baseColor = isAli ? '#0ea5e9' : '#8b5cf6'; // Blue for Ali, Purple for Nira
-    const glowColor = isListening ? '#10b981' : isSpeaking ? baseColor : isThinking ? (isAli ? '#22d3ee' : '#c084fc') : (isAli ? '#0369a1' : '#6366f1');
+// --- Portrait Camera Setup ---
+const Rig = ({ isFullScreen }) => {
+    const { camera, mouse } = useThree();
+    useFrame(() => {
+        // Subtle camera follow
+        camera.position.x = THREE.MathUtils.lerp(camera.position.x, mouse.x * 0.1, 0.05);
+        camera.position.y = THREE.MathUtils.lerp(camera.position.y, mouse.y * 0.1, 0.05);
+        camera.lookAt(0, 0.2, 0);
+    });
+    return null;
+};
+
+const NiraAvatar = ({ isSpeaking = false, isListening = false, isThinking = false, isFullScreen = false }) => {
+    const statusColor = isListening ? '#10b981' : isSpeaking ? '#8b5cf6' : '#6366f1';
 
     return (
         <div style={{
-            width: '100%',
-            height: isFullScreen ? '100vh' : '320px',
+            width: '100%', height: isFullScreen ? '100vh' : '400px',
             position: isFullScreen ? 'fixed' : 'relative',
-            top: 0, left: 0,
-            overflow: 'hidden',
-            background: isFullScreen ? '#020205' : 'transparent',
-            zIndex: isFullScreen ? 0 : 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.5s ease',
+            background: 'radial-gradient(circle at center, #0f0c29, #0a0a25, #000000)',
+            transition: 'all 0.5s'
         }}>
             <Canvas
-                camera={{ position: [0, 0, 7], fov: 40 }}
-                gl={{ antialias: true, alpha: true }}
-                style={{ width: '100%', height: '100%' }}
+                shadows
+                camera={{ position: [0, 0.2, 2.8], fov: 35 }} // Tight Face/Chest focus
+                gl={{ antialias: true }}
             >
-                {isFullScreen && <color attach="background" args={['#020205']} />}
+                <color attach="background" args={['#010103']} />
+                <fog attach="fog" args={['#010103', 5, 10]} />
+
+                <ambientLight intensity={0.2} />
+                <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} castShadow />
+                <pointLight position={[-2, 2, 2]} intensity={1} color={statusColor} />
 
                 <Suspense fallback={null}>
-                    <ErrorBoundary fallback={<mesh><sphereGeometry args={[2, 32, 32]} /><meshBasicMaterial wireframe color={glowColor} /></mesh>}>
-                        <Float speed={2} rotationIntensity={1} floatIntensity={1}>
-                            <ParticleSphere
-                                isSpeaking={isSpeaking}
-                                isThinking={isThinking}
-                                isListening={isListening}
-                                glowColor={glowColor}
-                            />
-                        </Float>
-                        <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
-                    </ErrorBoundary>
+                    <group position={[0, -0.2, 0]} scale={1.2}>
+                        <DigitalEntity
+                            isSpeaking={isSpeaking}
+                            isListening={isListening}
+                            isThinking={isThinking}
+                        />
+                    </group>
+                    <Environment preset="night" />
+                    <ContactShadows position={[0, -2, 0]} opacity={0.4} scale={10} blur={2} far={1} />
                 </Suspense>
 
-                {isFullScreen && <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.5} />}
+                <Rig isFullScreen={isFullScreen} />
+                {!isFullScreen && <OrbitControls enableZoom={false} enablePan={false} maxPolarAngle={Math.PI / 1.5} minPolarAngle={Math.PI / 3} />}
             </Canvas>
 
-            {/* Status Label Overlay */}
+            {/* Glowing Status Ring UI */}
             <div style={{
-                position: 'absolute',
-                bottom: isFullScreen ? '120px' : '20px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                padding: '10px 24px',
-                borderRadius: '50px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                boxShadow: `0 0 30px ${glowColor}33`,
-                transition: 'all 0.4s',
+                position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)',
+                textAlign: 'center', pointerEvents: 'none'
             }}>
                 <div style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: glowColor,
-                    boxShadow: `0 0 10px ${glowColor}`,
-                    animation: isListening || isSpeaking ? 'pulse-light 1s infinite' : 'none'
-                }} />
-                <span style={{
-                    color: 'white',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    letterSpacing: '1px',
-                    textTransform: 'uppercase'
+                    width: '100px', height: '100px', borderRadius: '50%',
+                    border: `2px solid ${statusColor}`,
+                    boxShadow: `0 0 30px ${statusColor}44`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    animation: isSpeaking || isListening ? 'pulse 2s infinite' : 'none'
                 }}>
-                    {isListening ? 'Listening' : isSpeaking ? 'Speaking' : isThinking ? 'Thinking' : 'Online'}
-                </span>
+                    <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '2px' }}>
+                        {isListening ? 'Alive' : isThinking ? 'Thinking' : 'NIRA'}
+                    </span>
+                </div>
             </div>
 
             <style>{`
-                @keyframes pulse-light {
-                    0%, 100% { transform: scale(1); opacity: 1; }
-                    50% { transform: scale(1.3); opacity: 0.5; }
+                @keyframes pulse {
+                    0% { transform: scale(1); opacity: 0.8; }
+                    50% { transform: scale(1.05); opacity: 1; }
+                    100% { transform: scale(1); opacity: 0.8; }
                 }
             `}</style>
         </div>

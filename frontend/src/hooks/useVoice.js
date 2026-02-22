@@ -1,53 +1,93 @@
 import { useState, useCallback } from 'react';
+import axios from 'axios';
+import { auth } from '../firebase';
 
 export const useVoice = () => {
     const [isListening, setIsListening] = useState(false);
 
-    const speak = useCallback((text, onStart, onEnd, lang = 'en', gender = 'female') => {
-        if (!window.speechSynthesis) return;
+    const speak = useCallback(async (text, onStart, onEnd, lang = 'en', speaker = 'priya', gender = 'female') => {
+        // Fallback to Browser TTS
+        const browserFallback = () => {
+            if (!window.speechSynthesis) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voices = window.speechSynthesis.getVoices();
+            let preferredVoice;
 
-        // Cancel any ongoing speech
-        window.speechSynthesis.cancel();
+            console.log(`🔊 [LOCAL FALLBACK] Using browser voice for: ${lang}, ${gender}`);
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        const voices = window.speechSynthesis.getVoices();
-        let preferredVoice;
-
-        if (lang === 'hi') {
-            // Find Hindi voices
-            const hiVoices = voices.filter(v => v.lang.includes('hi'));
-            if (gender === 'male') {
-                preferredVoice = hiVoices.find(v => v.name.includes('Male') || v.name.includes('Rishi') || v.name.includes('Google India'));
+            if (lang === 'hi') {
+                const hiVoices = voices.filter(v => v.lang.includes('hi'));
+                preferredVoice = hiVoices.find(v => v.name.includes(gender === 'male' ? 'Male' : 'Female')) || hiVoices[0];
             } else {
-                preferredVoice = hiVoices.find(v => v.name.includes('Female') || v.name.includes('Heera') || v.name.includes('Kalpana') || v.name.includes('Natural'));
+                const enVoices = voices.filter(v => v.lang.includes('en'));
+                preferredVoice = enVoices.find(v => v.name.includes(gender === 'male' ? 'Male' : 'Female')) || enVoices[0];
             }
-            // Fallback to any Hindi voice
-            if (!preferredVoice) preferredVoice = hiVoices[0];
 
-            utterance.rate = 1.05;
-            utterance.pitch = gender === 'male' ? 0.9 : 1.1;
-        } else {
-            // Find English voices
-            const enVoices = voices.filter(v => v.lang.includes('en'));
-            if (gender === 'male') {
-                preferredVoice = enVoices.find(v => v.name.includes('Male') || v.name.includes('Google UK English Male') || v.name.includes('Microsoft David'));
+            if (preferredVoice) {
+                console.log(`✅ [LOCAL VOICE] Selected: ${preferredVoice.name}`);
+                utterance.voice = preferredVoice;
+            }
+            utterance.onstart = onStart;
+            utterance.onend = onEnd;
+            utterance.onerror = onEnd;
+            window.speechSynthesis.speak(utterance);
+        };
+
+        try {
+            // Attempt Sarvam AI via Backend Proxy
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) {
+                console.warn("⚠️ Voice: No user token found.");
+                browserFallback();
+                return;
+            }
+
+            let apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+            if (apiUrl.endsWith('/')) apiUrl = apiUrl.slice(0, -1);
+            if (!apiUrl.endsWith('/api')) apiUrl += '/api';
+
+            const targetSpeaker = speaker || (gender === 'male' ? 'rohan' : 'priya');
+            console.group("🎙️ NIRA VOICE SYSTEM");
+            console.log(`Endpoint: ${apiUrl}/tts`);
+            console.log(`Requesting: ${targetSpeaker} (${lang})`);
+
+            const response = await axios.post(`${apiUrl}/tts`, {
+                text,
+                languageCode: lang === 'hi' ? 'hi-IN' : 'en-IN',
+                speaker: targetSpeaker
+            }, {
+                headers: { Authorization: `Bearer ${token}` },
+                timeout: 20000 // Increased to 20s for Bulbul v3 generation
+            });
+
+            if (response.data && response.data.audio) {
+                console.log("✅ [SARVAM SUCCESS]");
+                console.groupEnd();
+                if (onStart) onStart();
+                const audio = new Audio(`data:audio/wav;base64,${response.data.audio}`);
+                audio.onended = onEnd;
+                audio.onerror = (e) => {
+                    console.error("❌ Audio playback error:", e);
+                    browserFallback();
+                };
+                await audio.play();
             } else {
-                preferredVoice = enVoices.find(v => v.name.includes('Female') || v.name.includes('Google UK English Female') || v.name.includes('Heera') || v.name.includes('Zira'));
+                throw new Error('Sarvam returned empty audio data');
             }
-            // Fallback to any English voice
-            if (!preferredVoice) preferredVoice = enVoices[0];
+        } catch (error) {
+            const errorData = error.response?.data;
+            const errorMsg = errorData?.details || errorData?.error || error.message;
+            console.error('🛑 SARVAM ERROR:', errorMsg);
+            console.groupEnd();
 
-            utterance.rate = 0.95;
-            utterance.pitch = gender === 'male' ? 0.9 : 1.1;
+            // IF it's a 404, the backend proxy isn't found
+            if (error.response?.status === 404) {
+                console.error("CRITICAL: Backend /api/tts endpoint not found!");
+            }
+
+            browserFallback();
         }
-
-        if (preferredVoice) utterance.voice = preferredVoice;
-
-        utterance.onstart = onStart;
-        utterance.onend = onEnd;
-        utterance.onerror = onEnd;
-
-        window.speechSynthesis.speak(utterance);
     }, []);
 
     const listen = useCallback((onResult, lang = 'en') => {
