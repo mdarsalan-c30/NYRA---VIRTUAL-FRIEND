@@ -133,7 +133,7 @@ app.post('/api/tts', authenticate, async (req, res) => {
 });
 
 // Catch-all 404 handler for API routes
-app.use('/api/*', (req, res) => {
+app.use('/api', (req, res) => {
     console.warn(`🚨 404 - NOT FOUND: ${req.method} ${req.originalUrl}`);
     res.status(404).json({ error: 'API Endpoint not found', path: req.originalUrl });
 });
