@@ -97,10 +97,46 @@ app.use('/api/chat', authenticate, chatRoutes);
 const memoryRoutes = require('./routes/memory');
 app.use('/api/memory', authenticate, memoryRoutes);
 
-app.get('/api/tts-health', (req, res) => res.json({ status: 'TTS Backend is Reachable ✅', time: new Date().toISOString() }));
+// Health Check
+app.get('/api/tts-health', (req, res) => {
+    const key = process.env.SARVAM_API_KEY || '';
+    const cleanKeySnippet = key.trim().replace(/^["']|["']$/g, '').substring(0, 5);
+    res.json({
+        status: 'NIRA Backend Reachable ✅',
+        time: new Date().toISOString(),
+        sarvam_key_present: !!key,
+        sarvam_key_snippet: cleanKeySnippet + '...',
+        node_env: process.env.NODE_ENV || 'development'
+    });
+});
 
-const ttsRoutes = require('./routes/tts');
-app.use('/api/tts', authenticate, ttsRoutes);
+const ttsService = require('./services/sarvam');
+app.post('/api/tts', authenticate, async (req, res) => {
+    try {
+        const { text, languageCode, speaker } = req.body;
+        console.log(`🎙️ [PROD TTS] Speaker: ${speaker}, Lang: ${languageCode}, Text Len: ${text?.length}`);
+
+        if (!text) return res.status(400).json({ error: 'Text is required' });
+
+        const audioData = await ttsService.generateTTS(text, languageCode, speaker);
+
+        if (audioData) {
+            console.log(`✅ [PROD TTS SUCCESS] Generated for ${speaker}`);
+            res.json({ audio: audioData });
+        } else {
+            res.status(500).json({ error: 'Empty audio buffer from Sarvam' });
+        }
+    } catch (error) {
+        console.error(`❌ [PROD TTS ERROR]:`, error.message);
+        res.status(500).json({ error: 'TTS Generation failed', details: error.message });
+    }
+});
+
+// Catch-all 404 handler for API routes
+app.use('/api/*', (req, res) => {
+    console.warn(`🚨 404 - NOT FOUND: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: 'API Endpoint not found', path: req.originalUrl });
+});
 
 app.listen(PORT, () => {
     console.log(`🚀 NIRA Backend running on port ${PORT}`);

@@ -1,17 +1,18 @@
 const axios = require('axios');
 
 const generateTTS = async (text, languageCode = 'hi-IN', speaker = 'priya') => {
-    const apiKey = process.env.SARVAM_API_KEY;
+    let apiKey = process.env.SARVAM_API_KEY;
+
     if (!apiKey) {
         throw new Error('SARVAM_API_KEY not found in environment');
     }
 
-    try {
-        // Sarvam AI strictly requires lowercase speaker names.
-        // We also explicitly use 'bulbul:v3' to enable speakers like 'priya' and 'rohan'.
-        const formattedSpeaker = speaker.toLowerCase();
+    // Robust cleaning for environment variables (Render/Netlify sometimes add quotes or spaces)
+    apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
 
-        console.log(`🎙️ [Backend] Requesting Sarvam TTS: Model=bulbul:v3, Speaker=${formattedSpeaker}, Lang=${languageCode}`);
+    try {
+        const formattedSpeaker = speaker.toLowerCase();
+        console.log(`🎙️ [Backend] Calling Sarvam AI: Model=bulbul:v3, Speaker=${formattedSpeaker}, Key=${apiKey.substring(0, 5)}...`);
 
         const response = await axios.post('https://api.sarvam.ai/text-to-speech', {
             inputs: [text],
