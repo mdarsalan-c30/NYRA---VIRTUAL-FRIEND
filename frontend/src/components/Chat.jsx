@@ -13,6 +13,8 @@ const Chat = () => {
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [immersionMode, setImmersionMode] = useState(false);
     const [mobileStatus, setMobileStatus] = useState(false); // Controls chat drawer on mobile
+    const [seamlessV2V, setSeamlessV2V] = useState(true);
+    const [showChat, setShowChat] = useState(window.innerWidth > 1024); // Show by default on large screens
     const [stats, setStats] = useState({ days: 1, interactions: 0 });
     const [language, setLanguage] = useState(() => localStorage.getItem('nira_lang') || 'en');
     const [persona, setPersona] = useState(() => localStorage.getItem('nira_persona') || 'nira');
@@ -66,7 +68,13 @@ const Chat = () => {
 
             speak(aiResponse,
                 () => setIsSpeaking(true),
-                () => setIsSpeaking(false),
+                () => {
+                    setIsSpeaking(false);
+                    // Automatic voice loop: listen again if enabled
+                    if (seamlessV2V) {
+                        setTimeout(() => listen(handleSend, language), 800);
+                    }
+                },
                 language,
                 persona === 'ali' ? 'male' : 'female'
             );
@@ -121,14 +129,20 @@ const Chat = () => {
                     </div>
 
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => setPersona(persona === 'nira' ? 'ali' : 'nira')} style={headerBtnStyle}>
+                        <button onClick={() => setPersona(persona === 'nira' ? 'ali' : 'nira')} style={headerBtnStyle} title="Switch Persona">
                             {persona === 'nira' ? '👩' : '👨'}
                         </button>
-                        <button onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')} style={headerBtnStyle}>
+                        <button onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')} style={headerBtnStyle} title="Switch Language">
                             {language === 'en' ? '🇺🇸' : '🇮🇳'}
+                        </button>
+                        <button onClick={() => setSeamlessV2V(!seamlessV2V)} style={{ ...headerBtnStyle, color: seamlessV2V ? '#10b981' : 'white' }} title="Toggle Auto-Voice Loop">
+                            {seamlessV2V ? '🎤♾️' : '🎤'}
                         </button>
                         <button onClick={() => setImmersionMode(true)} style={headerBtnStyle} title="Focus Mode">
                             <Sparkles size={16} />
+                        </button>
+                        <button onClick={() => setShowChat(!showChat)} style={headerBtnStyle} title="Toggle Chat Panel">
+                            {showChat ? '📖' : '💬'}
                         </button>
                         <button onClick={() => setIsFullScreen(!isFullScreen)} style={headerBtnStyle}>
                             {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -140,19 +154,45 @@ const Chat = () => {
                 </header>
             )}
 
-            {/* Immersion Mode Exit */}
+            {/* Immersion Mode Controls Overlay */}
             {immersionMode && (
-                <button
-                    onClick={() => setImmersionMode(false)}
-                    style={{
-                        position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)',
-                        zIndex: 200, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-                        backdropFilter: 'blur(10px)', color: 'white', padding: '12px 24px', borderRadius: '30px',
-                        cursor: 'pointer', fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-                    }}
-                >
-                    Exit Focus Mode
-                </button>
+                <div style={{
+                    position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px'
+                }}>
+                    <div style={{
+                        background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                        backdropFilter: 'blur(20px)', padding: '8px 16px', borderRadius: '40px',
+                        display: 'flex', gap: '12px', alignItems: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+                    }}>
+                        <button onClick={() => setSeamlessV2V(!seamlessV2V)} style={{ ...headerBtnStyle, background: 'none', border: 'none', color: seamlessV2V ? '#10b981' : 'white' }}>
+                            {seamlessV2V ? '🎤 Loop On' : '🎤 Loop Off'}
+                        </button>
+                        <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.1)' }} />
+                        <button
+                            onClick={() => listen(handleSend, language)}
+                            style={{
+                                width: '44px', height: '44px', borderRadius: '50%', border: 'none',
+                                background: isListening ? '#ef4444' : '#6366f1', color: 'white', cursor: 'pointer'
+                            }}
+                        >
+                            <Mic size={20} />
+                        </button>
+                        <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.1)' }} />
+                        <button onClick={() => setPersona(persona === 'nira' ? 'ali' : 'nira')} style={{ ...headerBtnStyle, background: 'none', border: 'none' }}>
+                            {persona === 'nira' ? '👩' : '👨'}
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => setImmersionMode(false)}
+                        style={{
+                            background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+                            fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline'
+                        }}
+                    >
+                        Exit Focus Mode
+                    </button>
+                </div>
             )}
 
             {/* Main Stage */}
@@ -189,9 +229,10 @@ const Chat = () => {
                     borderTopRightRadius: isMobile ? '30px' : '0',
                     display: 'flex', flexDirection: 'column',
                     zIndex: 10,
-                    opacity: immersionMode ? 0 : 1,
-                    pointerEvents: (immersionMode || (isMobile && !mobileStatus)) ? 'none' : 'auto',
+                    opacity: (immersionMode || !showChat) ? 0 : 1,
+                    pointerEvents: (immersionMode || !showChat || (isMobile && !mobileStatus)) ? 'none' : 'auto',
                     transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transform: (showChat || (isMobile && mobileStatus)) ? 'translateX(0)' : 'translateX(100%)',
                     boxShadow: isMobile ? '0 -10px 40px rgba(0,0,0,0.8)' : '-10px 0 30px rgba(0,0,0,0.5)',
                 }}>
                     {isMobile && (
@@ -202,7 +243,7 @@ const Chat = () => {
                         {messages.length === 0 && (
                             <div style={{ margin: 'auto', textAlign: 'center', opacity: 0.3 }}>
                                 <Sparkles size={40} style={{ marginBottom: '10px' }} />
-                                <p>Begin your journey with {persona === 'nira' ? 'Nira' : 'Ali'}</p>
+                                <p>Conversation with {persona === 'nira' ? 'Nira' : 'Ali'}</p>
                             </div>
                         )}
                         {messages.map((msg, i) => (
@@ -241,6 +282,21 @@ const Chat = () => {
                         </div>
                     </footer>
                 </div>
+
+                {/* Floating Chat Toggle (Desktop) */}
+                {!isMobile && !showChat && !immersionMode && (
+                    <button
+                        onClick={() => setShowChat(true)}
+                        style={{
+                            position: 'absolute', top: '20px', right: '20px',
+                            background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)',
+                            color: 'white', padding: '10px 20px', borderRadius: '30px', cursor: 'pointer',
+                            zIndex: 5, backdropFilter: 'blur(10px)', fontWeight: 600, transition: 'all 0.3s'
+                        }}
+                    >
+                        💬 Show Chat
+                    </button>
+                )}
 
                 {/* Mobile FAB */}
                 {isMobile && !mobileStatus && !immersionMode && (
