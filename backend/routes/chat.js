@@ -54,50 +54,52 @@ router.post('/', async (req, res) => {
         // 2. Get Gemini response
         const aiResponse = await getChatResponse(message, memory);
 
-        // 3. Save messages in a batch
-        const batch = db.batch();
-        const userMsgRef = profileRef.collection('conversations').doc();
-        batch.set(userMsgRef, {
-            role: 'user',
-            content: message,
-            timestamp: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        const aiMsgRef = profileRef.collection('conversations').doc();
-        batch.set(aiMsgRef, {
-            role: 'model',
-            content: aiResponse,
-            timestamp: admin.firestore.FieldValue.serverTimestamp()
-        });
-
-        // Update interaction count and metadata
-        const profileUpdate = {
-            totalInteractions: admin.firestore.FieldValue.increment(1),
-            lastActive: admin.firestore.FieldValue.serverTimestamp()
-        };
-        // Set createdAt if it doesn't exist (only happens once)
-        if (!profileDoc.exists || !profileDoc.data().createdAt) {
-            profileUpdate.createdAt = admin.firestore.FieldValue.serverTimestamp();
-        }
-        batch.set(profileRef, profileUpdate, { merge: true });
-
-        await batch.commit();
-
-        // 4. Return response
+        // 3. Return response IMMEDIATELY (Non-blocking DB saves)
         res.json({ response: aiResponse });
 
-        // 5. Fire-and-forget: update emotional state & extract facts
-        updateEmotionalState(userId, message, aiResponse);
+        // 4. Background Tasks: Save messages, update stats, emotional state, etc.
+        (async () => {
+            try {
+                const batch = db.batch();
+                const userMsgRef = profileRef.collection('conversations').doc();
+                batch.set(userMsgRef, {
+                    role: 'user',
+                    content: message,
+                    timestamp: admin.firestore.FieldValue.serverTimestamp()
+                });
 
-        // 6. Name Extraction & Persistence (Improved in v2.7.0)
-        // If user says "Mera naam X hai", "Samad hoon", "My name is X", etc.
-        const nameRegex = /(?:mera naam|my name is|i am|main|this is)\s+([a-zA-Z]{2,15})(?:\s+hai|\s+hoon|\s+here|$)/i;
-        const match = message.match(nameRegex);
-        if (match && match[1] && (!profileDoc.exists || !profileDoc.data().name)) {
-            const extractedName = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
-            console.log(`👤 [Name Recovery] Extracted name: ${extractedName}. Saving to profile...`);
-            await profileRef.set({ name: extractedName }, { merge: true });
-        }
+                const aiMsgRef = profileRef.collection('conversations').doc();
+                batch.set(aiMsgRef, {
+                    role: 'model',
+                    content: aiResponse,
+                    timestamp: admin.firestore.FieldValue.serverTimestamp()
+                });
+
+                const profileUpdate = {
+                    totalInteractions: admin.firestore.FieldValue.increment(1),
+                    lastActive: admin.firestore.FieldValue.serverTimestamp()
+                };
+                if (!profileDoc.exists || !profileDoc.data().createdAt) {
+                    profileUpdate.createdAt = admin.firestore.FieldValue.serverTimestamp();
+                }
+                batch.set(profileRef, profileUpdate, { merge: true });
+
+                await batch.commit();
+
+                // Name extraction
+                const nameRegex = /(?:mera naam|my name is|i am|main|this is)\s+([a-zA-Z]{2,15})(?:\s+hai|\s+hoon|\s+here|$)/i;
+                const match = message.match(nameRegex);
+                if (match && match[1] && (!profileDoc.exists || !profileDoc.data().name)) {
+                    const extractedName = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+                    console.log(`👤 [Lazy Persistence] Name found: ${extractedName}`);
+                    await profileRef.set({ name: extractedName }, { merge: true });
+                }
+
+                updateEmotionalState(userId, message, aiResponse);
+            } catch (bgErr) {
+                console.warn("⚠️ Background persistence failed:", bgErr.message);
+            }
+        })();
 
     } catch (error) {
         console.error("Chat route error:", error);

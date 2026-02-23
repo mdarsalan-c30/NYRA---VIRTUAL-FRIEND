@@ -165,5 +165,5 @@ app.use('/api', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 NIRA Backend v2.8.0 running on port ${PORT}`);
+    console.log(`🚀 NIRA Backend v2.9.0 running on port ${PORT}`);
 });

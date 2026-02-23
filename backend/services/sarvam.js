@@ -40,15 +40,15 @@ const generateTTS = async (text, languageCode = 'hi-IN', speaker = 'priya') => {
             inputs: [cleanedText],
             target_language_code: languageCode,
             speaker: formattedSpeaker,
-            model: 'bulbul:v3',
-            pace: 1.0,
+            model: 'bulbul:v2', // Switched to v2 for high-speed low-latency generation
+            pace: 1.1,          // Slightly faster pace for a snappier feel
             speech_sample_rate: 16000
         }, {
             headers: {
                 'api-subscription-key': apiKey,
                 'Content-Type': 'application/json'
             },
-            timeout: 25000 // Increased for high-quality v3 generation
+            timeout: 10000 // Reduced timeout: v2 should respond within seconds
         });
 
         if (response.data && response.data.audios && response.data.audios[0]) {
