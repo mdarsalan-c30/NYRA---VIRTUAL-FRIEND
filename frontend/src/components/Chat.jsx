@@ -158,23 +158,49 @@ const Chat = () => {
         if (fileInputRef.current) fileInputRef.current.click();
     };
 
+    const compressImage = (base64Str, maxWidth = 800) => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = base64Str;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = (maxWidth / width) * height;
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compressing to 70% quality
+            };
+        });
+    };
+
     const handleFileChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
         const reader = new FileReader();
         reader.onload = async (event) => {
-            const base64 = event.target.result;
+            const rawBase64 = event.target.result;
             setLoading(true);
             setVisionLoading(true);
             try {
+                // Compress before sending to avoid payload limits
+                const base64 = await compressImage(rawBase64);
+
                 const token = await auth.currentUser.getIdToken();
                 const visionRes = await axios.post(`${API_URL}/vision`,
                     { image: base64 },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
                 const desc = visionRes.data.description;
-                handleSend(`Look at this image: ${desc}`); // Send description as context
+                handleSend(`Look at this image: ${desc}`);
             } catch (err) {
                 console.error("Gallery upload failed:", err);
                 alert("Failed to analyze image.");
@@ -190,7 +216,30 @@ const Chat = () => {
             alert("Turn on NIRA Sight (Camera) first!");
             return;
         }
-        handleSend("Hey, what do you see right now?");
+
+        setVisionLoading(true);
+        try {
+            // 1. Capture real frame
+            const snapshot = cameraService.takeSnapshot(videoRef.current);
+            if (!snapshot) throw new Error("Could not capture frame");
+
+            // 2. Get AI description
+            const token = await auth.currentUser.getIdToken();
+            const visionRes = await axios.post(`${API_URL}/vision`,
+                { image: snapshot },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            const desc = visionRes.data.description;
+
+            // 3. Send to chat with context
+            handleSend(`I'm looking at this... (Observed: ${desc})`);
+        } catch (err) {
+            console.error("NIRA Look failed:", err);
+            handleSend("Hey, what do you see right now?"); // Fallback to normal text
+        } finally {
+            setVisionLoading(false);
+        }
     };
 
     const headerBtnStyle = {

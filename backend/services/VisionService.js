@@ -41,9 +41,11 @@ class VisionService {
             console.log(`⚙️ Gemini Vision: Processing ${mimeType} (${(cleanBase64.length / 1024).toFixed(2)} KB)`);
 
             const prompt = `
-                You are the eyes of NIRA, an Indian female friend.
-                Look at this image. Describe what you see naturally in 2 sentences.
-                Talk as if you are seeing it right now.
+                You are the eyes of NIRA, a warm Indian female friend. 
+                Describe what you see in this image in normal informal Hinglish (Mix 70% Hindi, 30% English). 
+                Keep it to 1-2 friendly sentences. 
+                Example: "Yaar, ye table par ek mast laptop rakha hai" or "Honestly, tumhari smile bohot cute lag rahi hai".
+                Talk in the present tense as if seeing it right now.
             `;
 
             const imagePart = {
