@@ -3,8 +3,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 class VisionService {
     constructor() {
         this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        // Use Gemini 1.5 Flash for fast vision analysis
-        this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        // Use Gemini 1.5 Flash Latest for maximum speed
+        this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
     }
 
     /**

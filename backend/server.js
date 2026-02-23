@@ -112,24 +112,22 @@ const authenticate = async (req, res, next) => {
     }
 };
 
-// Routes
-const chatRoutes = require('./routes/chat');
-app.use('/api/chat', authenticate, chatRoutes);
+// Mission Critical Routes (Move above catch-alls and broad routers)
+const visionService = require('./services/VisionService');
+app.post('/api/vision', authenticate, async (req, res) => {
+    try {
+        const { image } = req.body;
+        if (!image) return res.status(400).json({ error: 'Image is required' });
 
-const memoryRoutes = require('./routes/memory');
-app.use('/api/memory', authenticate, memoryRoutes);
+        console.log(`👁️ [VISION REQUEST] Processing snapshot...`);
+        const description = await visionService.analyzeImage(image);
 
-// Health Check
-app.get('/api/tts-health', (req, res) => {
-    const key = process.env.SARVAM_API_KEY || '';
-    const cleanKey = key.trim().replace(/^["']|["']$/g, '');
-    res.json({
-        status: 'NIRA Backend Reachable ✅',
-        time: new Date().toISOString(),
-        sarvam_key_present: !!key,
-        sarvam_key_snippet: cleanKey.substring(0, 8) + '...',
-        node_env: process.env.NODE_ENV || 'production'
-    });
+        console.log(`✅ [VISION SUCCESS] Description: ${description?.substring(0, 30)}...`);
+        res.json({ description });
+    } catch (error) {
+        console.error(`❌ [VISION ERROR]:`, error.message);
+        res.status(500).json({ error: 'Vision analysis failed', details: error.message });
+    }
 });
 
 const ttsService = require('./services/sarvam');
@@ -154,22 +152,11 @@ app.post('/api/tts', authenticate, async (req, res) => {
     }
 });
 
-const visionService = require('./services/VisionService');
-app.post('/api/vision', authenticate, async (req, res) => {
-    try {
-        const { image } = req.body;
-        if (!image) return res.status(400).json({ error: 'Image is required' });
-
-        console.log(`👁️ [VISION REQUEST] Processing snapshot...`);
-        const description = await visionService.analyzeImage(image);
-
-        console.log(`✅ [VISION SUCCESS] Description: ${description?.substring(0, 30)}...`);
-        res.json({ description });
-    } catch (error) {
-        console.error(`❌ [VISION ERROR]:`, error.message);
-        res.status(500).json({ error: 'Vision analysis failed', details: error.message });
-    }
-});
+// Broad Routers
+const chatRoutes = require('./routes/chat');
+const memoryRoutes = require('./routes/memory');
+app.use('/api/chat', authenticate, chatRoutes);
+app.use('/api/memory', authenticate, memoryRoutes);
 
 // Catch-all 404 handler for API routes
 app.use('/api', (req, res) => {

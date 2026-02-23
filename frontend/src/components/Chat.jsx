@@ -84,56 +84,50 @@ const Chat = () => {
         try {
             const token = await auth.currentUser.getIdToken();
 
-            // If camera is on, capture a fresh snapshot for context
-            let activeVisionDescription = null;
+            // Capture snapshot if camera is on to send in the SAME request (Parallel processing)
+            let snapshot = null;
             if (isCameraOn && videoRef.current) {
-                setVisionLoading(true);
                 try {
-                    const snapshot = cameraService.takeSnapshot(videoRef.current);
-                    const visionRes = await axios.post(`${API_URL}/vision`,
-                        { image: snapshot },
-                        { headers: { Authorization: `Bearer ${token}` } }
-                    );
-                    activeVisionDescription = visionRes.data.description;
-                    console.log("👁️ NIRA Vision Analysis:", activeVisionDescription);
+                    snapshot = cameraService.takeSnapshot(videoRef.current);
+                    setVisionLoading(true);
                 } catch (vErr) {
-                    console.error("Vision capture failed:", vErr);
-                } finally {
-                    setVisionLoading(false);
+                    console.warn("Vision capture failed:", vErr);
                 }
             }
 
-            const response = await axios.post(`${API_URL}/chat`,
-                {
-                    message: text,
-                    persona,
-                    visionDescription: activeVisionDescription
-                },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const response = await axios.post(`${API_URL}/chat`, {
+                message: text,
+                persona: persona,
+                image: snapshot // Send image directly to chat route for internal parallel processing
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
 
             const aiResponse = response.data.response;
-            setMessages(prev => [...prev, { role: 'model', content: aiResponse }]);
+            const newAiMsg = { role: 'model', content: aiResponse };
+            setMessages(prev => [...prev, newAiMsg]);
 
-            console.log(`🗣️ NIRA triggering speech: [${selectedVoice}] for persona [${persona}]`);
-            speak(aiResponse,
-                () => setIsSpeaking(true),
-                () => {
-                    setIsSpeaking(false);
-                    // Automatic voice loop: listen again if enabled
-                    if (seamlessV2V) {
-                        setTimeout(() => listen(handleSend, language), 800);
-                    }
-                },
-                language,
-                selectedVoice,
-                persona === 'ali' ? 'male' : 'female'
-            );
+            // Clear vision loading if it was set
+            setVisionLoading(false);
+
+            // Trigger Voice
+            if (seamlessV2V) {
+                setIsSpeaking(true);
+                speak(aiResponse,
+                    () => setIsSpeaking(true),
+                    () => setIsSpeaking(false),
+                    language,
+                    selectedVoice,
+                    persona === 'ali' ? 'male' : 'female'
+                );
+            }
         } catch (error) {
             console.error('Chat error:', error);
-            setMessages(prev => [...prev, { role: 'error', content: 'Connection hiccup. Try again?' }]);
+            const errorMsg = { role: 'model', content: "Mafi chahti hoon, thoda network ka issue lag raha hai. Kya tum firse bol sakte ho? 🙏" };
+            setMessages(prev => [...prev, errorMsg]);
         } finally {
             setLoading(false);
+            setVisionLoading(false);
         }
     };
 
@@ -191,16 +185,11 @@ const Chat = () => {
             setLoading(true);
             setVisionLoading(true);
             try {
-                // Compress before sending to avoid payload limits
+                // Compress before sending
                 const base64 = await compressImage(rawBase64);
 
-                const token = await auth.currentUser.getIdToken();
-                const visionRes = await axios.post(`${API_URL}/vision`,
-                    { image: base64 },
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
-                const desc = visionRes.data.description;
-                handleSend(`Look at this image: ${desc}`);
+                // Directly send to chat for parallel analysis
+                await handleSend(`Hey Nira, look at this picture I just uploaded.`, base64);
             } catch (err) {
                 console.error("Gallery upload failed:", err);
                 alert("Failed to analyze image.");
@@ -217,26 +206,14 @@ const Chat = () => {
             return;
         }
 
-        setVisionLoading(true);
+        // Capture and send immediately
         try {
-            // 1. Capture real frame
+            setVisionLoading(true);
             const snapshot = cameraService.takeSnapshot(videoRef.current);
-            if (!snapshot) throw new Error("Could not capture frame");
-
-            // 2. Get AI description
-            const token = await auth.currentUser.getIdToken();
-            const visionRes = await axios.post(`${API_URL}/vision`,
-                { image: snapshot },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            const desc = visionRes.data.description;
-
-            // 3. Send to chat with context
-            handleSend(`I'm looking at this... (Observed: ${desc})`);
+            await handleSend("What do you see right now?", snapshot);
         } catch (err) {
             console.error("NIRA Look failed:", err);
-            handleSend("Hey, what do you see right now?"); // Fallback to normal text
+            handleSend("What do you see right now?");
         } finally {
             setVisionLoading(false);
         }

@@ -7,7 +7,7 @@ const memoryService = require('../services/MemoryService');
 const db = admin.firestore();
 
 router.post('/', async (req, res) => {
-    const { message } = req.body;
+    const { message, image } = req.body;
     const userId = req.user.uid;
 
     if (!message) {
@@ -15,16 +15,29 @@ router.post('/', async (req, res) => {
     }
 
     try {
-        // 1. Fetch user data in parallel
         const profileRef = db.collection('users').doc(userId);
 
-        const [profileDoc, emotionalDoc, longTermSnapshot, conversationsSnapshot, stats] = await Promise.all([
+        // 1. Fetch memory and optionally visionary description in parallel
+        const visionService = require('../services/VisionService');
+        const tasks = [
             profileRef.get(),
             profileRef.collection('emotionalState').doc('current').get(),
             profileRef.collection('longTermMemory').orderBy('timestamp', 'desc').limit(10).get().catch(() => ({ docs: [] })),
             profileRef.collection('conversations').orderBy('timestamp', 'desc').limit(15).get().catch(() => ({ docs: [] })),
             memoryService.getFriendshipStats(userId)
-        ]);
+        ];
+
+        // If an image is provided, add vision analysis to the parallel tasks
+        if (image) {
+            console.log("📸 [Chat Route] Image detected, launching parallel vision analysis...");
+            tasks.push(visionService.analyzeImage(image).catch(err => {
+                console.warn("⚠️ Parallel Vision failed:", err.message);
+                return null;
+            }));
+        }
+
+        const results = await Promise.all(tasks);
+        const [profileDoc, emotionalDoc, longTermSnapshot, conversationsSnapshot, stats, visionDesc] = results;
 
         const memory = {
             identity: profileDoc.exists ? profileDoc.data() : {},
@@ -32,11 +45,11 @@ router.post('/', async (req, res) => {
             longTerm: longTermSnapshot.docs.map(doc => doc.data().summary).filter(Boolean),
             recentMessages: conversationsSnapshot.docs.map(doc => doc.data()).reverse(),
             stats,
-            persona: req.body.persona || 'nira', // Allow frontend to specify persona
-            visionDescription: req.body.visionDescription // Support for vision-enabled chats
+            persona: req.body.persona || 'nira',
+            visionDescription: visionDesc || req.body.visionDescription // Use parallel result or manual prop
         };
 
-        console.log(`Fetched memory for ${userId}. Messages: ${memory.recentMessages.length}, Facts: ${memory.longTerm.length}`);
+        if (visionDesc) console.log(`✅ [Chat Route] Vision Success: ${visionDesc.substring(0, 30)}...`);
 
         // 2. Get Gemini response
         const aiResponse = await getChatResponse(message, memory);
