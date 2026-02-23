@@ -74,7 +74,7 @@ const Chat = () => {
     useEffect(() => { localStorage.setItem('nira_voice', selectedVoice); }, [selectedVoice]);
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-    const VERSION = "2.9.0";
+    const VERSION = "2.9.2";
     useEffect(() => {
         console.log(`%c 🚀 NIRA SYSTEM v${VERSION} ACTIVE `, 'background: #6366f1; color: white; font-weight: bold; font-size: 1.2rem; padding: 4px; border-radius: 4px;');
     }, []);
@@ -127,7 +127,11 @@ const Chat = () => {
                 setIsSpeaking(true);
                 speak(aiResponse,
                     () => setIsSpeaking(true),
-                    () => setIsSpeaking(false),
+                    () => {
+                        setIsSpeaking(false);
+                        // AUTO-LOOP: Restart listening after she finishes speaking
+                        if (seamlessV2V) listen(handleSend, language);
+                    },
                     language,
                     selectedVoice,
                     persona === 'ali' ? 'male' : 'female'

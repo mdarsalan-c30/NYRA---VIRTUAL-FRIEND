@@ -168,5 +168,5 @@ app.use('/api', (req, res) => {
 app.get('/api/tts-health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
-    console.log(`🚀 NIRA Backend v2.9.1 running on port ${PORT}`);
+    console.log(`🚀 NIRA Backend v2.9.2 running on port ${PORT}`);
 });
