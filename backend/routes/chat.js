@@ -4,6 +4,7 @@ const admin = require('firebase-admin');
 const { getChatResponse } = require('../services/gemini');
 const memoryService = require('../services/MemoryService');
 
+const AdminService = require('../services/AdminService');
 const db = admin.firestore();
 
 router.post('/', async (req, res) => {
@@ -15,6 +16,14 @@ router.post('/', async (req, res) => {
     }
 
     try {
+        // 0. ADMIN GATEKEEPER: Check for limits/emergency
+        const limitCheck = await AdminService.checkLimits(userId);
+        if (!limitCheck.allowed) {
+            console.warn(`🛑 [Limit Reached] User ${userId}: ${limitCheck.reason}`);
+            // Return a friendly message from Nira if blocked
+            return res.json({ response: limitCheck.reason, blocked: true });
+        }
+
         const profileRef = db.collection('users').doc(userId);
 
         // 1. Fetch memory and optionally visionary description in parallel
@@ -96,6 +105,9 @@ router.post('/', async (req, res) => {
                 }
 
                 updateEmotionalState(userId, message, aiResponse);
+
+                // Log Usage for Analytics
+                AdminService.logUsage(userId, { type: 'chat', tokens: 1 }); // Basic count for now
             } catch (bgErr) {
                 console.warn("⚠️ Background persistence failed:", bgErr.message);
             }

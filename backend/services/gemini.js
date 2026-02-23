@@ -1,5 +1,6 @@
 const Groq = require('groq-sdk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AdminService = require('./AdminService');
 
 const SYSTEM_PROMPT = (persona = 'nira', emotionalState = {}, userName = null) => {
     const isAli = persona === 'ali';
@@ -37,6 +38,12 @@ const MOCK_RESPONSES = [
 ];
 
 async function getChatResponse(userMessage, memory) {
+    // Get Dynamic Config from AdminService
+    const config = AdminService.getConfig() || { ai: { primaryModel: 'groq', fallbackModel: 'gemini', temperature: 0.85 } };
+    const primaryModel = config.ai?.primaryModel || 'groq';
+    const fallbackModel = config.ai?.fallbackModel || 'gemini';
+    const temperature = config.ai?.temperature || 0.85;
+
     const recentStr = (memory.recentMessages || [])
         .slice(-8)
         .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
@@ -70,10 +77,12 @@ async function getChatResponse(userMessage, memory) {
     const searchIntents = ['search', 'google', 'youtube', 'link', 'today', 'latest', 'news', 'weather', 'who is', 'what is', 'find', 'gana', 'song', 'video', 'play', 'trending'];
     const needsSearch = searchIntents.some(intent => userMessage.toLowerCase().includes(intent));
 
-    // --- PRIMARY: Groq (Brain) - Only if not a search request ---
-    if (process.env.GROQ_API_KEY && !needsSearch) {
+    // --- PRIMARY: Dynamic Model Routing ---
+    const useGroq = primaryModel === 'groq' && process.env.GROQ_API_KEY && !needsSearch;
+
+    if (useGroq) {
         try {
-            console.log("🧠 [Brain] Using Groq (Llama 3.3) for reasoning...");
+            console.log(`🧠 [Brain] Using Groq (Llama 3.3) for reasoning... (Temp: ${temperature})`);
             const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
             const completion = await groq.chat.completions.create({
                 model: 'llama-3.3-70b-versatile',
@@ -83,7 +92,7 @@ async function getChatResponse(userMessage, memory) {
                     { role: 'user', content: finalUserMessage }
                 ],
                 max_tokens: 250,
-                temperature: 0.85,
+                temperature: temperature,
             });
             const text = completion.choices[0]?.message?.content?.trim();
             if (text) return text;

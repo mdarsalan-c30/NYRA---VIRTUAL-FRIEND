@@ -6,7 +6,7 @@ import { Mic, Send, LogOut, Maximize2, Minimize2, Sparkles, MessageCircle, Camer
 import NiraAvatar from './NiraAvatar';
 import { cameraService } from '../services/CameraService';
 
-const Chat = () => {
+const Chat = ({ isAdmin, onOpenAdmin }) => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -74,7 +74,7 @@ const Chat = () => {
     useEffect(() => { localStorage.setItem('nira_voice', selectedVoice); }, [selectedVoice]);
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-    const VERSION = "2.9.2";
+    const VERSION = "3.0.0";
     useEffect(() => {
         console.log(`%c 🚀 NIRA SYSTEM v${VERSION} ACTIVE `, 'background: #6366f1; color: white; font-weight: bold; font-size: 1.2rem; padding: 4px; border-radius: 4px;');
     }, []);
@@ -369,6 +369,11 @@ const Chat = () => {
                                 <button onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')} style={headerBtnStyle} title="Switch Language">
                                     {language === 'en' ? '🇺🇸' : '🇮🇳'}
                                 </button>
+                                {isAdmin && (
+                                    <button onClick={onOpenAdmin} style={{ ...headerBtnStyle, color: '#818cf8', border: '1px solid rgba(129, 140, 248, 0.3)', background: 'rgba(129, 140, 248, 0.1)' }} title="System Control">
+                                        🛡️
+                                    </button>
+                                )}
                                 <button onClick={() => setSeamlessV2V(!seamlessV2V)} style={{ ...headerBtnStyle, color: seamlessV2V ? '#10b981' : 'white' }} title="Toggle Auto-Voice Loop">
                                     {seamlessV2V ? '🎤♾️' : '🎤'}
                                 </button>
@@ -449,6 +454,11 @@ const Chat = () => {
                                 <button onClick={() => { setImmersionMode(true); setShowSettings(false); }} style={{ ...appBtnStyle(false), color: '#8b5cf6' }}>
                                     FULL AVATAR MODE 🌌
                                 </button>
+                                {isAdmin && (
+                                    <button onClick={() => { onOpenAdmin(); setShowSettings(false); }} style={{ ...appBtnStyle(false), background: 'rgba(129, 140, 248, 0.2)', border: '1px solid #818cf8', color: '#818cf8', marginTop: '10px' }}>
+                                        SYSTEM CONTROL (ADMIN) 🛡️
+                                    </button>
+                                )}
                                 <button onClick={toggleCamera} style={{ ...appBtnStyle(isCameraOn), color: isCameraOn ? '#ee4444' : '#10b981' }}>
                                     NIRA SIGHT (CAMERA): {isCameraOn ? 'ON' : 'OFF'}
                                 </button>

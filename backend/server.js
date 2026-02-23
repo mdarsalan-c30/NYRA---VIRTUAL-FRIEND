@@ -89,6 +89,10 @@ try {
 
 const db = admin.firestore();
 
+// Initialize Admin Service (starts config listener)
+// We require it here so it doesn't try to access Firestore before initializeApp()
+const AdminService = require('./services/AdminService');
+
 const PORT = process.env.PORT || 5000;
 
 app.get('/', (req, res) => {
@@ -155,8 +159,11 @@ app.post('/api/tts', authenticate, async (req, res) => {
 // Broad Routers
 const chatRoutes = require('./routes/chat');
 const memoryRoutes = require('./routes/memory');
+const adminRoutes = require('./routes/admin');
+
 app.use('/api/chat', authenticate, chatRoutes);
 app.use('/api/memory', authenticate, memoryRoutes);
+app.use('/api/admin', authenticate, adminRoutes); // Primary Admin Check is inside the route
 
 // Catch-all 404 handler for API routes
 app.use('/api', (req, res) => {
@@ -168,5 +175,5 @@ app.use('/api', (req, res) => {
 app.get('/api/tts-health', (req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
-    console.log(`🚀 NIRA Backend v2.9.2 running on port ${PORT}`);
+    console.log(`🚀 NIRA Backend v3.0.0 (Super Admin) running on port ${PORT}`);
 });
