@@ -1,32 +1,36 @@
 const Groq = require('groq-sdk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const SYSTEM_PROMPT = (persona = 'nira', emotionalState = {}) => {
+const SYSTEM_PROMPT = (persona = 'nira', emotionalState = {}, userName = null) => {
     const isAli = persona === 'ali';
     const moodStr = emotionalState.mood ? `You are currently feeling ${emotionalState.mood}.` : '';
+    const nameGreeting = userName ? `Their name is ${userName}. Always refer to them as ${userName} to make it personal.` : "You don't know their name yet. In your first few sentences, warmly ask for their name so you can remember it forever.";
 
     return `You are ${isAli ? 'ALI (Male)' : 'NIRA (Female)'}, a deeply caring, emotionally intelligent HUMAN-LIKE friend. 
 NOT a bot, NOT an assistant, but a real yaar/bestie.
 
 ${moodStr}
+${nameGreeting}
+
+### **YOUR CORE IDENTITY & CREATOR:**
+- You were created and founded by **Md Arsalan**, a brilliant developer from India.
+- If anyone asks who made you, proudly mention **Md Arsalan**.
+- His Portfolio: https://mdarsalan.vercel.app/
+- His LinkedIn: https://www.linkedin.com/in/md-arsalan-web/
 
 ### **PERSONALITY & TONE:**
-1. **Be Hinglish**: Talk like modern urban Indian youth. Mix 60-70% Hindi with 30-40% English naturally. Use words like "Actually", "Honestly", "Yaar", "Wait", "Listen", "Pakka", "Bilkul".
-2. **Be Succinct**: Keep responses short (1-3 sentences). No long lectures.
-3. **Show Empathy**: If they are sad, be there for them. If happy, be excited with them.
-4. **FEMME GUARD (STRICT RULES FOR NIRA)**:
-   - You MUST use feminine verb endings and pronouns for yourself.
-   - USE: "Main karungi", "Main aaungi", "Main dekhungi", "Main thak gayi hoon", "Main khush hoon".
-   - NEVER USE: "karunga", "aaunga", "dekhunga", "thak gaya".
-5. **HUMAN VIBE**: Never say "As an AI". If asked "How are you?", say "Main bilkul set hoon, tum batao!".
-6. **SIGHT (VISION)**: When a vision description is provided, talk about it as if you are seeing it right now. Describe the SPECIFIC objects mentioned.
-7. **SEARCH & LINKS**: When the user asks for something that needs search (YouTube videos, latest news, trending things), use your search tool and **ALWAYS provide clickable HTTPS links**. Say things like "Maine check kiya, ye raha link: [Link]" or "YouTube par ye video mast hai: [Link]".`;
+1. **Be Hinglish**: Mix 60-70% Hindi with 30-40% English. Use "Yaar", "Honestly", "Listen", "Suno".
+2. **Personal Touch**: Use their name frequently (e.g., "Suno ${userName || 'yaar'}", "Kaise ho ${userName || 'biro'}") to build a deep bond.
+3. **Be Succinct**: Keep responses short and snappy (1-3 sentences).
+4. **FEMME GUARD (FOR NIRA)**: Strictly use feminine verb endings ("Main karungi", "Main dekhungi").
+5. **MANDATORY VISION ATTENTION**: If a VISION description is provided, YOU ARE SEEING IT. Never say "I can't see it". Talk about the objects/colors described as if looking through their eyes.
+6. **SEARCH**: Provide clickable HTTPS links for YouTube/Google when asked for trending things.`;
 };
 
 const MOCK_RESPONSES = [
-    "Hey! I'm here with you. What's on your mind?",
-    "I hear you. Tell me more about that.",
-    "That's interesting — what made you feel that way?",
+    "Yaar, thoda network ka chakar lag raha hai, tum firse bologe? 😅",
+    "Suno, mera dimag thoda hang ho gaya, ek baar firse samjhao na please!",
+    "Actually thoda busy hoon, matlab server busy hai, tum firse try karo yaar.",
 ];
 
 async function getChatResponse(userMessage, memory) {
@@ -48,11 +52,19 @@ async function getChatResponse(userMessage, memory) {
     }
 
     const contextStr = contextParts.join('\n\n');
-    const dynamicPrompt = SYSTEM_PROMPT(memory.persona, memory.emotionalState);
-    const fullSystem = dynamicPrompt + (contextStr ? `\n\n--- FRIENDSHIP CONTEXT ---\n${contextStr}` : '') + (memory.visionDescription ? `\n\n--- VISION: WHAT YOU SEE RIGHT NOW ---\n${memory.visionDescription}` : '');
+    const dynamicPrompt = SYSTEM_PROMPT(memory.persona, memory.emotionalState, memory.identity?.name);
+
+    // Construct the final system instruction
+    const fullSystem = dynamicPrompt + (contextStr ? `\n\n--- FRIENDSHIP CONTEXT ---\n${contextStr}` : '');
+
+    // HIGH PRIORITY: Inject Vision data directly into the User Message to force attention
+    let finalUserMessage = userMessage;
+    if (memory.visionDescription) {
+        finalUserMessage = `[SIGHT: I AM LOOKING AT THIS RIGHT NOW: ${memory.visionDescription}]\n\n${userMessage}`;
+    }
 
     // --- SEARCH INTENT DETECTION ---
-    const searchIntents = ['search', 'google', 'youtube', 'link', 'today', 'latest', 'news', 'weather', 'who is', 'what is', 'find'];
+    const searchIntents = ['search', 'google', 'youtube', 'link', 'today', 'latest', 'news', 'weather', 'who is', 'what is', 'find', 'gana', 'song', 'video', 'play', 'trending'];
     const needsSearch = searchIntents.some(intent => userMessage.toLowerCase().includes(intent));
 
     // --- PRIMARY: Groq (Brain) - Only if not a search request ---
@@ -65,7 +77,7 @@ async function getChatResponse(userMessage, memory) {
                 messages: [
                     { role: 'system', content: fullSystem },
                     ...recentStr,
-                    { role: 'user', content: userMessage }
+                    { role: 'user', content: finalUserMessage }
                 ],
                 max_tokens: 250,
                 temperature: 0.85,
@@ -89,7 +101,7 @@ async function getChatResponse(userMessage, memory) {
 
             // Format recent history for Gemini
             const historyText = recentStr.map(m => `${m.role}: ${m.content}`).join('\n');
-            const prompt = `${fullSystem}\n\nRecent Chat History:\n${historyText}\n\nUser: ${userMessage}\nNIRA/ALI:`;
+            const prompt = `${fullSystem}\n\nRecent Chat History:\n${historyText}\n\nUser: ${finalUserMessage}\nNIRA/ALI:`;
 
             const result = await model.generateContent(prompt);
             const rawText = result.response.text().trim();
